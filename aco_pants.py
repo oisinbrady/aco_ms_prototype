@@ -69,7 +69,7 @@ def main():
 	for c in cluster_centers:
 		print(len(c))
 	print(cluster_centers)
-	print("====")
+	print("=====")
 
 	# todo: follow path and determine 'real' nodes to link b/w clusters 
 		# (m-point, consider nodes w/n range b/w centroid and m-point [half of cluster's nodes])
