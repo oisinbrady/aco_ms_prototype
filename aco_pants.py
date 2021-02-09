@@ -99,18 +99,8 @@ def main():
 
 	# print(f"{ordered_clusters}\n")
 
-	# todo: follow path and determine 'real' nodes to link b/w clusters 
+	# Find the mid-point between clusters & determine nodes to link b/w clusters 
 	linkage_nodes = list()  # all nodes that link clusters
-
-
-	# res = None
-	# temp = iter(test_dict) 
-	# for key in temp: 
-	#     if key == test_key: 
-	#         res = next(temp, None) 
-
-
-	# find the mid-point between clusters
 	temp = list(ordered_clusters.items())
 	for i in range(len(ordered_clusters)):
 		c1 = temp[i]
@@ -118,31 +108,24 @@ def main():
 			c2 = temp[0]  # last cluster in path back to start cluster, similar to a circular array
 		else:
 			c2 = temp[i + 1]  # current cluster to next in path
-		# print(f"c1x = {c1[0][0]}, c2x = {c2[0][0]}")
-		# print(f"c1y = {c1[0][1]}, c2y = {c2[0][1]}")
 
 		m = [(c1[1][0][0]+c2[1][0][0])/2, (c1[1][0][1]+c2[1][0][1])/2]  # mid point b/w centroids
 		# print(f"m-point = {m}")
 
-		# for clusters c1, c2, find nodes with shortest distance to m-point
-
-		c1_non_link = list(filter(lambda x : x not in linkage_nodes, c1[1][1:]))
+		# For clusters c1, c2, find node with shortest distance to m-point
+		c1_non_link = list(filter(lambda x : x not in linkage_nodes, c1[1][1:]))  # c1_nodes ∉ linkage_nodes
 		c1_min = min(c1_non_link, key=lambda x:euclidean(x,m))
 
-
-		c2_non_link = list(filter(lambda x : x not in linkage_nodes, c2[1][1:]))
+		c2_non_link = list(filter(lambda x : x not in linkage_nodes, c2[1][1:]))  # c2_nodes ∉ linkage_nodes
 		c2_min = min(c2_non_link, key=lambda x:euclidean(x,m))
 
+		# get the cluster each link belongs to
+		label_c1 = c1[0]
+		label_c2 = c2[0]
+		linkage_nodes.append((label_c1, c1_min))
+		linkage_nodes.append((label_c2, c2_min))
 
-		linkage_nodes.append(c1_min)
-		linkage_nodes.append(c2_min)
-
-		# print(c1_min)
-		# print(c2_min)
-
-		# print(f"\nlinkage_nodes={linkage_nodes}\n")
-
-	# todo: for each cluster, solve aco world
+	# For each cluster, solve aco world
 	cluster_paths = list()
 	for c in list(ordered_clusters.items()):
 		world = pants.World(c[1], euclidean)
@@ -150,17 +133,14 @@ def main():
 		solution = solver.solve(world)
 		cluster_paths.append(solution.tour)
 
+	print(f"{ordered_clusters}\n")
 	print(f"{cluster_paths}\n")
 	print(linkage_nodes)
 	
-	# for c in list(ordered_clusters.items())
-	# 	world = pants.World(cluster_centers.tolist(), euclidean)
-	# 	solver = pants.Solver()
-	# 	solution = solver.solve(world)
-		# N.B. edge case needed for clusters of size 2 and 1 
-		# if |cluster| = 2, simply link nodes, if 1, link to next cluster in path
+	# N.B. edge case needed for clusters of size 2 and 1 
+	# if |cluster| = 2, simply link nodes, if 1, link to next cluster in path
 
-	# todo: build full path, using linked nodes
+	# TODO: build full path, using linked nodes - READ NOTES FILE
 		# add edges between 'linkage' nodes
 		# remove 'extra' path ways for all nodes with edges > 2
 		# remove the longer edge, or remove if edge connects to another 'linkage' node
