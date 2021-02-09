@@ -51,7 +51,7 @@ def main():
 
 	cities_np = np.array(nodes)
 	ms = MeanShift(bin_seeding=True)
-	ms.fit(cities_np)
+	ms.fit(cities_np)  # use mean shift algorithm
 	labels = ms.labels_
 	cluster_centers = ms.cluster_centers_  # centroids of all clusters
 
@@ -61,17 +61,47 @@ def main():
 	print("number of estimated clusters : %d" % n_clusters_)
 
 	plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels)
+	print(labels)
 
-	# todo: determine path between clusters via ACO - using centroids as artificial nodes
-	print("====")
-	print(nodes)
-	print("====")
-	for c in cluster_centers:
-		print(len(c))
 	print(cluster_centers)
-	print("=====")
 
+	clusters = dict()  # a dict of lists (list of cities in each cluster)
+	# N.B., the first value for each cluster key will be the cluster centroid 
+	for k in range(n_clusters_):
+		cities = list()
+		cities.append(cluster_centers[k].tolist())  # add centroid value
+		for i, city_xy in enumerate(cities_np.tolist()):
+			if labels[i] == k:
+				cities.append(city_xy)  # add city belonging to current cluster
+		clusters[k] = cities
+
+
+	print("cluster output here!!")
+	print(clusters)
+
+	# Determine path between clusters via ACO - using centroids as artificial nodes
+	world = pants.World(cluster_centers.tolist(), euclidean)
+	solver = pants.Solver()
+	solution = solver.solve(world)
+
+	# solution contains: total distance(.distance), nodes visited order (.tour), edges visited order(.path)
+	print(f"{solution.tour}")
+	
 	# todo: follow path and determine 'real' nodes to link b/w clusters 
+	linkage_nodes = list()  # all nodes that link clusters
+	m_points = list()
+
+	for i, c1 in enumerate(solution.tour):
+		# find the mid-point between both clusters
+		if i + 1 == len(solution.tour):
+			c2 = solution.tour[0]  # last cluster in path back to start cluster
+		else:
+			c2 = solution.tour[i + 1]  # current cluster to next in path
+		m = [(c1[0]+c2[0])/2,(c1[1]+c2[1])/2]
+		# print(f"m-point b/w c{i} and c{i+1}: {m}")
+		m_points.append(m)
+
+
 		# (m-point, consider nodes w/n range b/w centroid and m-point [half of cluster's nodes])
 		# store these nodes (in order) as 'linkage nodes'
 
@@ -85,13 +115,6 @@ def main():
 		# remove the longer edge, or remove if edge connects to another 'linkage' node
 		# there should now exist exactly two nodes that have 1 edge; link these for a complete path
 
-	world = pants.World(cluster_centers.tolist(), euclidean)
-	solver = pants.Solver()
-
-	solution = solver.solve(world)
-
-	# total distance, nodes visited order, edges visited order
-	print(f"{solution.distance}\n{solution.tour}\n{solution.path}")
 
 if __name__ == '__main__':
 	main()
