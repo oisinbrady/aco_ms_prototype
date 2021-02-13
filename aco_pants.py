@@ -90,7 +90,7 @@ def main():
 	# for e in solution.path:
 	# 	print(vars(e))
 
-	# re-order clusters array according to tour solution
+	# re-order clusters array according to tour solution of centroids
 	ordered_clusters = dict()
 	for c in solution.tour:
 		for k in clusters:
@@ -128,17 +128,71 @@ def main():
 	# For each cluster, solve aco world
 	cluster_paths = list()
 	for c in list(ordered_clusters.items()):
-		world = pants.World(c[1], euclidean)
+		# create hamiltonian cycle for cluster's nodes excluding centroid
+		world = pants.World(c[1][1:], euclidean)
 		solver = pants.Solver()
 		solution = solver.solve(world)
 		cluster_paths.append(solution.tour)
 
-	print(f"{ordered_clusters}\n")
-	print(f"{cluster_paths}\n")
-	print(linkage_nodes)
+	print(f"{ordered_clusters}\n")  # hamiltonian cycle of CENTROIDS
+	print(f"{cluster_paths}\n")  # hamiltonian cycle of each CLUSTER
+	print(linkage_nodes)  # nodes that link between clusters (contains cluster labels)
 	
 	# N.B. edge case needed for clusters of size 2 and 1 
 	# if |cluster| = 2, simply link nodes, if 1, link to next cluster in path
+
+
+	# build hamiltonian cycle between all clusters using linkage nodes
+	# essentially, each hamiltonian cycle is converted into a hamiltonian path by removing certain edges based 
+		# of linkage nodes for each cluster and their distance to the next cluster centroid
+	# TODO k is cluster number and so is not in order, use i instead of subscripting cluster_paths
+	i = 0  # index of cluster in cluster_paths
+	for cluster_id in ordered_clusters:
+		# when |ordered_clusters[cluster_id]| = 2
+		if len(cluster_paths[i]) == 2:
+			if i == len(cluster_paths):
+				next_kc = ordered_clusters[0][0]  # next cluster centroid will be at start of list
+			else:
+				next_kc = ordered_clusters[i+1][0]  # centroid of next cluster
+			# re-order cluster path if necessary
+			if euclidean(cluster_paths[i][0], next_kc) < euclidean(cluster_paths[i][1], next_kc):
+				cluster_paths[i] = [cluster_paths[i][1], cluster_paths[i][0]]	
+		elif len(cluster_paths[i]) > 2:
+			# find current cluster's linkage nodes: l1 and l2
+			cluster_link_nodes = list()		
+			for n in linkage_nodes:
+				if linkage_nodes[n][0] == cluster_id:  # if linkage node has current cluster_id label
+					cluster_link_nodes.append(linkage_nodes[n][1])
+				if len(cluster_link_nodes) == 2:
+					break  # as all clusters have exactly 2 link nodes
+			
+			# calculate which one is closer to next cluster, assign as "end_node"
+			c = ordered_clusters[cluster_id][0]  # centroid of next cluster
+			cluster_link_nodes.sort(lambda x:euclidean(x,c))
+			start_node = cluster_link_nodes[0]
+			end_node = cluster_link_nodes[1]
+			# get locations of start & end nodes in cluster path
+			s_loc = None
+			e_loc = None
+			for index in range(len(cluster_paths[i])):
+				if cluster_paths[i][n] == start_node:
+					s_loc = n
+				elif cluster_paths[i][n] == end_node:
+					e_loc = n
+				if s_loc is not None and e_loc is not None:
+					break
+
+			l1 = None
+			if s_loc > e_loc:
+				l1 = cluster_paths[i][s_loc+1:] + cluster_paths[i][0:e_loc-1]
+			# re-order cluster path so start_node is at list[0] and end_node is at list[len(list)-1] (Hamiltonian cycle -> H. path)
+
+
+
+		i = i + 1
+
+				
+
 
 	# TODO: build full path, using linked nodes - READ NOTES FILE
 		# add edges between 'linkage' nodes
