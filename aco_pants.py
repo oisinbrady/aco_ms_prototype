@@ -6,6 +6,7 @@ from sklearn.datasets import make_blobs
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import cycle
+import networkx as nx
 
 
 def plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels) -> None:
@@ -21,6 +22,7 @@ def plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels) -> None:
 	             markeredgecolor='k', markersize=14)
 	plt.title('Estimated number of clusters: %d' % n_clusters_)
 	plt.savefig("graph.png")
+	plt.close()
 
 
 # length function for weight value of edges
@@ -126,8 +128,6 @@ def main():
 	# build hamiltonian cycle between all clusters using linkage nodes
 	# essentially, each hamiltonian cycle is converted into a hamiltonian path by removing certain edges based 
 		# of linkage nodes for each cluster and their distance to the next cluster centroid
-
-
 	for i, c in enumerate(ordered_clusters):
 		if len(c[1]) == 2:
 			# obtain centroid of next cluster after current
@@ -150,6 +150,7 @@ def main():
 			s_loc = None
 			e_loc = None
 			
+			# find index locations of start and end nodes
 			for index in range(len(c[1])):
 				if c[1][index] == start_node:
 					s_loc = index
@@ -158,25 +159,59 @@ def main():
 				if s_loc is not None and e_loc is not None:
 					break
 
-			# re-order cluster path so start_node is at list[0] and end_node is at list[len(list)-1] 
-			# i.e., Hamiltonian cycle -> H. path
+
+			'''
+			Re-order cluster path so start_node is at list[0] 
+			and end_node is at list[len(list)-1]. I.e, 
+			convert the Hamiltonian cycle into a H. path
+			''' 
+			# TODO bug here
 			if s_loc > e_loc:
-				r = c[1][s_loc+1:]
-				if s_loc - e_loc != 1:
-					l = c[1][s_loc-1:e_loc+1:-1]
-				else:
-					l = []
-				ordered_clusters[i][1] = [c[1][s_loc] + l + r + c[1][e_loc]]
+				# everything between "right" of start node and end node,
+					# as though the array is circular
+				r = c[1][s_loc+1:] + c[1][0:e_loc]
+				l = c[1][s_loc-1:e_loc:-1]
+				ordered_clusters[i][1] = [c[1][s_loc]] + l + r + [c[1][e_loc]]
 			elif e_loc > s_loc:
-				r = c[1][e_loc+1:] + c[1][0:s_loc-1]
-				if e_loc - s_loc != 1:
-					l = c[1][e_loc-1:s_loc+1:-1]
-				else:
-					l = [] 
-				ordered_clusters[i][1] = [c[1][s_loc] + l + r + c[1][e_loc]]
+				r = c[1][s_loc+1:e_loc]
+				l = c[1][s_loc-1::-1] + c[1][len(c[1])-1:e_loc:-1]
+				ordered_clusters[i][1] = [c[1][s_loc]] + l + r + [c[1][e_loc]]
 
 	for c in ordered_clusters:
 		print(c[1])
+
+	print("\n")
+	path = list()
+	for c in ordered_clusters:
+		for n in c[1]:
+			print(n)
+			path.append(n)
+
+	print(path)
+
+	G = nx.Graph()
+	for i, n in enumerate(path):
+		print(n)
+		G.add_node(i, pos=n)
+		if i == len(path) - 1:
+			v = 0
+			G.add_node(0, pos=path[0])
+		else:
+			v = i + 1
+			G.add_node(i+1, pos=path[i+1])
+
+		print(i,v)
+		G.add_edge(i,v)
+
+	print(list(G.nodes))
+	print(list(G.edges))
+
+	# TODO bug in path rebuilding (H.cycle -> H.path) is causing incorrect pathing
+	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
+
+	plt.savefig("solution.png")
+
+	# TODO calculate total distance (using euclidean function for each edge in path)
 
 if __name__ == '__main__':
 	main()
