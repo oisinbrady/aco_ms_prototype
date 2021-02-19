@@ -174,24 +174,19 @@ def main():
 				ordered_clusters[i][1] = [c[1][s_loc]] + l + r + [c[1][e_loc]]
 			elif e_loc > s_loc:
 				r = c[1][s_loc+1:e_loc]
-				l = c[1][s_loc-1::-1] + c[1][len(c[1])-1:e_loc:-1]
+				if s_loc != 0:
+					l = c[1][s_loc-1::-1] + c[1][len(c[1])-1:e_loc:-1]
+				else:
+					l = c[1][len(c[1])-1:e_loc:-1]
 				ordered_clusters[i][1] = [c[1][s_loc]] + l + r + [c[1][e_loc]]
 
-	for c in ordered_clusters:
-		print(c[1])
-
-	print("\n")
 	path = list()
 	for c in ordered_clusters:
 		for n in c[1]:
-			print(n)
 			path.append(n)
-
-	print(path)
 
 	G = nx.Graph()
 	for i, n in enumerate(path):
-		print(n)
 		G.add_node(i, pos=n)
 		if i == len(path) - 1:
 			v = 0
@@ -200,11 +195,8 @@ def main():
 			v = i + 1
 			G.add_node(i+1, pos=path[i+1])
 
-		print(i,v)
 		G.add_edge(i,v)
 
-	print(list(G.nodes))
-	print(list(G.edges))
 
 	# TODO bug in path rebuilding (H.cycle -> H.path) is causing incorrect pathing
 	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
