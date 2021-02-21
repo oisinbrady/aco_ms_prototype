@@ -34,13 +34,15 @@ def euclidean(a, b):
 	# "P01" https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
 
 def get_cities() -> list:
-	filename = "city_xy"
+	# filename = "city_xy"
+	filename = "city_xy_2"
 	nodes = []
 
 	with open(filename, 'r') as f:
 		for city in f:
-			city = city.strip()
-			xy = city.split(',')
+			# city = city.strip()
+			# xy = city.split(',')
+			xy = city.split()
 			xy = [float(coordinate) for coordinate in xy]
 			nodes.append(xy)
 
@@ -185,6 +187,7 @@ def main():
 		for n in c[1]:
 			path.append(n)
 
+	# create a graph for solution
 	G = nx.Graph()
 	for i, n in enumerate(path):
 		G.add_node(i, pos=n)
@@ -197,13 +200,18 @@ def main():
 
 		G.add_edge(i,v)
 
-
-	# TODO bug in path rebuilding (H.cycle -> H.path) is causing incorrect pathing
 	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
 
 	plt.savefig("solution.png")
 
-	# TODO calculate total distance (using euclidean function for each edge in path)
+	# calculate total distance
+	total_distance = 0
+	for i, n in enumerate(path):
+		if i == len(path) - 1:
+			total_distance = total_distance + euclidean(n, path[0])
+		else:
+			total_distance = total_distance + euclidean(n, path[i+1])
+	print(f"total distance of tour = {total_distance}")
 
 if __name__ == '__main__':
 	main()
