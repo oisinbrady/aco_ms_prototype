@@ -9,6 +9,12 @@ from itertools import cycle
 import networkx as nx
 
 
+# TODO seperate progam to solve via standalone ACO strategy
+# Use cProfiler to compare runtime performance
+
+# TODO find alternative clustering algorithms
+
+
 def plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels) -> None:
 	plt.figure(1)
 	plt.clf()
@@ -33,9 +39,14 @@ def euclidean(a, b):
 	# "P01" https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
 
 def get_cities() -> list:
+	# 9125 "cities" in Argentina, FAILS b/c only one cluster produced
+	# Therefore, need to reconsider clustering algorithm
+	# filename = "data_sets/ar9125_nodes.txt"  
+
+	# filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
 	# filename = "gen_cities.txt"  # 116 cities
-	# filename = "city_xy_2"  # 48 cities
-	filename = "city_xy"  # 15 cities
+	filename = "city_xy_2"  # 48 cities
+	# filename = "city_xy"  # 15 cities
 	nodes = []
 
 	with open(filename, 'r') as f:
