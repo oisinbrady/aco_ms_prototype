@@ -29,69 +29,54 @@ def plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels) -> None:
 def euclidean(a, b):
 	return math.sqrt(pow(a[1] - b[1], 2) + pow(a[0] - b[0], 2))
 
-
 # create the cities' coordinates array
 	# "P01" https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
 
 def get_cities() -> list:
-	# filename = "city_xy"
-	filename = "city_xy_2"
+	# filename = "gen_cities.txt"  # 116 cities
+	# filename = "city_xy_2"  # 48 cities
+	filename = "city_xy"  # 15 cities
 	nodes = []
 
 	with open(filename, 'r') as f:
 		for city in f:
-			# city = city.strip()
-			# xy = city.split(',')
-			xy = city.split()
+			city = city.strip()
+			xy = city.split(',')
 			xy = [float(coordinate) for coordinate in xy]
 			nodes.append(xy)
 
 	return nodes
 
-def main():
-	nodes = get_cities()
 
-	# apply clustering algorithm
+def draw_solution(path:list) -> None:
+	G = nx.Graph()
+	for i, n in enumerate(path):
+		G.add_node(i, pos=n)
+		if i == len(path) - 1:
+			v = 0
+			G.add_node(0, pos=path[0])
+		else:
+			v = i + 1
+			G.add_node(i+1, pos=path[i+1])
 
-	cities_np = np.array(nodes)
-	ms = MeanShift(bin_seeding=True)
-	ms.fit(cities_np)  # use mean shift algorithm
-	labels = ms.labels_
-	cluster_centers = ms.cluster_centers_  # centroids of all clusters
+		G.add_edge(i,v)
 
-	labels_unique = np.unique(labels)
-	n_clusters_ = len(labels_unique)
+	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
 
-	plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels)
-
-	clusters = list()  # a list of lists (list of cities in each cluster)
-	for k in range(n_clusters_):
-		meta_info = list()  # to contain centroid xy, and link nodes (2) xy
-		meta_info.append(cluster_centers[k].tolist())  # add centroid value
-		cities = list()  # xy coordinates of all city nodes
-		for i, city_xy in enumerate(cities_np.tolist()):
-			if labels[i] == k:
-				cities.append(city_xy)  # add city belonging to current cluster
-		clusters.append([meta_info, cities])
+	plt.savefig("solution.png")
 
 
-	# Determine inter-cluster path via ACO - using centroids as artificial nodes
-	world = pants.World(cluster_centers.tolist(), euclidean)
-	solver = pants.Solver()
-	inter_cluster_solution = solver.solve(world)
+def tour_distance(path:list) -> None:
+	total_distance = 0
+	for i, n in enumerate(path):
+		if i == len(path) - 1:
+			total_distance = total_distance + euclidean(n, path[0])
+		else:
+			total_distance = total_distance + euclidean(n, path[i+1])
+	print(f"total distance of tour = {total_distance}")
 
-	# re-order clusters array according to inter_cluster_solution
-	ordered_clusters = list()
-	for c in inter_cluster_solution.tour:
-		for k in clusters:
-			if c == k[0][0]:
-				ordered_clusters.append(k)
 
-	# print(f"{ordered_clusters}\n")
-
-	# Find mid-point b/w clusters to link nodes b/w clusters 
-	link_nodes = list()
-
+def find_link_nodes(link_nodes:list, ordered_clusters:list):
 	for i, c in enumerate(ordered_clusters):
 		# get the next cluster in inter-cluster path
 		next_c_index = None
@@ -119,24 +104,24 @@ def main():
 		link_nodes.append(next_c_link)
 
 
-	# For each cluster, solve aco world
+def rebuild_path(ordered_clusters:list):
+	''' 
+	Build Hamiltonian cycle b/w clusters using linkage nodes
+	I.e., convert each H.cycle within a cluster into a H.path by removing certain edges based 
+	of distance of linkage nodes to next cluster's (in inter-cluster path) centroid. This 
+	involves the reordering of the list of nodes in a clusters solution s.t. the link 
+	node nearests to the next centroid is at the end of the list and the other is at 
+	the start, whilst maintaining the order of the cluster's solution path between all 
+	non-link nodes.
+	'''
 	for i, c in enumerate(ordered_clusters):
-		# create hamiltonian cycle for cluster's nodes excluding centroid
-		world = pants.World(c[1], euclidean)
-		solver = pants.Solver()
-		solution = solver.solve(world)
-		ordered_clusters[i][1]= solution.tour
+		# obtain centroid of next cluster after current cluster
+		if i == len(ordered_clusters) - 1 :
+			next_c = ordered_clusters[0]
+		else:
+			next_c = ordered_clusters[i+1]
 
-	# build hamiltonian cycle between all clusters using linkage nodes
-	# essentially, each hamiltonian cycle is converted into a hamiltonian path by removing certain edges based 
-		# of linkage nodes for each cluster and their distance to the next cluster centroid
-	for i, c in enumerate(ordered_clusters):
 		if len(c[1]) == 2:
-			# obtain centroid of next cluster after current
-			if i == len(ordered_clusters) - 1 :
-				next_c = ordered_clusters[0]  # similar in behaviour to a circular list (TODO?)
-			else:
-				next_c = ordered_clusters[i+1]
 			# re-order cluster path if necessary
 			if euclidean(c[1][0], next_c[0][0]) < euclidean(c[1][1], next_c[0][0]):
 				ordered_clusters[i][1] = [c[1][1], c[1][0]]	
@@ -167,7 +152,6 @@ def main():
 			and end_node is at list[len(list)-1]. I.e, 
 			convert the Hamiltonian cycle into a H. path
 			''' 
-			# TODO bug here
 			if s_loc > e_loc:
 				# everything between "right" of start node and end node,
 					# as though the array is circular
@@ -182,36 +166,71 @@ def main():
 					l = c[1][len(c[1])-1:e_loc:-1]
 				ordered_clusters[i][1] = [c[1][s_loc]] + l + r + [c[1][e_loc]]
 
+
+def main():
+	nodes = get_cities()
+
+	# apply clustering algorithm
+
+	cities_np = np.array(nodes)
+	ms = MeanShift(bin_seeding=True)
+	ms.fit(cities_np)  # use mean shift algorithm
+	labels = ms.labels_
+	cluster_centers = ms.cluster_centers_  # centroids of all clusters
+
+	labels_unique = np.unique(labels)
+	n_clusters_ = len(labels_unique)
+
+	plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels)
+
+	# initialise cluster's list. Holds paths and meta data. I.e. link nodes 
+	clusters = list()
+	for k in range(n_clusters_):
+		meta_info = list()  # to contain centroid xy, and link nodes (2) xy
+		meta_info.append(cluster_centers[k].tolist())  # add centroid value
+		cities = list()  # xy coordinates of all city nodes
+		for i, city_xy in enumerate(cities_np.tolist()):
+			if labels[i] == k:
+				cities.append(city_xy)  # add city belonging to current cluster
+		clusters.append([meta_info, cities])
+
+
+	# Determine inter-cluster path via ACO - using centroids as artificial nodes
+	world = pants.World(cluster_centers.tolist(), euclidean)
+	solver = pants.Solver()
+	inter_cluster_solution = solver.solve(world)
+
+	# re-order clusters array according to inter_cluster_solution
+	ordered_clusters = list()
+	for c in inter_cluster_solution.tour:
+		for k in clusters:
+			if c == k[0][0]:
+				ordered_clusters.append(k)
+
+	# Find mid-point b/w clusters to link nodes b/w clusters 
+	link_nodes = list()
+	find_link_nodes(link_nodes, ordered_clusters)
+
+	# For each cluster, solve aco world
+	for i, c in enumerate(ordered_clusters):
+		# create Hamiltonian cycle for cluster's nodes
+		world = pants.World(c[1], euclidean)
+		solver = pants.Solver()
+		solution = solver.solve(world)
+		ordered_clusters[i][1]= solution.tour
+
+	
+	rebuild_path(ordered_clusters)
+
+	# create a list containing only the solution
 	path = list()
 	for c in ordered_clusters:
 		for n in c[1]:
 			path.append(n)
 
-	# create a graph for solution
-	G = nx.Graph()
-	for i, n in enumerate(path):
-		G.add_node(i, pos=n)
-		if i == len(path) - 1:
-			v = 0
-			G.add_node(0, pos=path[0])
-		else:
-			v = i + 1
-			G.add_node(i+1, pos=path[i+1])
-
-		G.add_edge(i,v)
-
-	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
-
-	plt.savefig("solution.png")
-
-	# calculate total distance
-	total_distance = 0
-	for i, n in enumerate(path):
-		if i == len(path) - 1:
-			total_distance = total_distance + euclidean(n, path[0])
-		else:
-			total_distance = total_distance + euclidean(n, path[i+1])
-	print(f"total distance of tour = {total_distance}")
+	# auxiliary functions
+	draw_solution(path)  # create a graph for solution
+	tour_distance(path)  # calculate total distance
 
 if __name__ == '__main__':
 	main()
