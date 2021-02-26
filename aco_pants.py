@@ -13,6 +13,7 @@ import networkx as nx
 # Use cProfiler to compare runtime performance
 
 # TODO find alternative clustering algorithms
+# 	IDEA: DB clustering, will need to calculate centroids if using current solution
 
 
 def plot_cluster_graph(n_clusters_, cluster_centers, cities_np, labels) -> None:
@@ -45,8 +46,8 @@ def get_cities() -> list:
 
 	# filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
 	# filename = "gen_cities.txt"  # 116 cities
-	filename = "city_xy_2"  # 48 cities
-	# filename = "city_xy"  # 15 cities
+	# filename = "city_xy_2"  # 48 cities
+	filename = "city_xy"  # 15 cities
 	nodes = []
 
 	with open(filename, 'r') as f:
@@ -87,7 +88,11 @@ def tour_distance(path:list) -> None:
 	print(f"total distance of tour = {total_distance}")
 
 
-def find_link_nodes(link_nodes:list, ordered_clusters:list):
+def find_link_nodes(ordered_clusters:list) -> None:
+	'''
+	calculate and add link nodes to meta data of each cluster
+	'''
+	link_nodes = list()
 	for i, c in enumerate(ordered_clusters):
 		# get the next cluster in inter-cluster path
 		next_c_index = None
@@ -115,7 +120,7 @@ def find_link_nodes(link_nodes:list, ordered_clusters:list):
 		link_nodes.append(next_c_link)
 
 
-def rebuild_path(ordered_clusters:list):
+def rebuild_path(ordered_clusters:list) -> None:
 	''' 
 	Build Hamiltonian cycle b/w clusters using linkage nodes
 	I.e., convert each H.cycle within a cluster into a H.path by removing certain edges based 
@@ -184,7 +189,7 @@ def main():
 	# apply clustering algorithm
 
 	cities_np = np.array(nodes)
-	ms = MeanShift(bin_seeding=True)
+	ms = MeanShift(bin_seeding=True)  # TODO
 	ms.fit(cities_np)  # use mean shift algorithm
 	labels = ms.labels_
 	cluster_centers = ms.cluster_centers_  # centroids of all clusters
@@ -219,8 +224,7 @@ def main():
 				ordered_clusters.append(k)
 
 	# Find mid-point b/w clusters to link nodes b/w clusters 
-	link_nodes = list()
-	find_link_nodes(link_nodes, ordered_clusters)
+	find_link_nodes(ordered_clusters)
 
 	# For each cluster, solve aco world
 	for i, c in enumerate(ordered_clusters):
