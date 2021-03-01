@@ -43,12 +43,12 @@ def get_nodes() -> list:
 	# filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
 
 	# CUSTOM - randomized cities built ontop of "P01" template
-	# filename = "gen_cities.txt"  # 116 cities
+	# filename = "data_sets/gen_cities.txt"  # 116 cities
 
 	# SMALL
 	# https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
-	# filename = "city_xy_2"  # "ATT48" American US state capitals
-	filename = "city_xy"  # # "P01": 15 cities
+	# filename = "data_sets/city_xy_2"  # "ATT48" American US state capitals
+	filename = "data_sets/city_xy"  # # "P01": 15 cities
 	nodes = []
 
 	with open(filename, 'r') as f:
