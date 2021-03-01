@@ -1,13 +1,9 @@
 import pants
 import math
-import random
-from sklearn.cluster import MeanShift, estimate_bandwidth
-from sklearn.datasets import make_blobs
 import numpy as np
 import matplotlib.pyplot as plt
-from itertools import cycle
 import networkx as nx
-import hdbscan
+import hdbscan  #  https://hdbscan.readthedocs.io/en/latest/comparing_clustering_algorithms.html#hdbscan
 import seaborn as sns
 
 
@@ -15,25 +11,44 @@ import seaborn as sns
 # Use cProfiler to compare runtime performance
 
 # TODO find alternative clustering algorithms
-# 	IDEA: DB clustering, will need to calculate centroids if using current solution
 
+# TODO, current bottle neck within ACO of inter_cluster_nodes. 
+	# I.e., Non-cluster nodes and 1 core node of each cluster.
+	# "LARGE" instances incur significat wait times
+	# Consider:
+	# 	Iteration limit param: "limit=x"
+	#	ACO library is rather old, is the implementation efficient?
+	#	Reversing method of solving inter/intra-cluster paths
+		# (ACO for clusters and 2-opt/3-opt(? - slower) for everything else)
+	# Heuristic for pre-determining size of cluster
+		# See HDBSCAN for parameter configuration
+			# IDEA: grid cell mean density pre-computation to determine param(s)
 
 # length function for weight value of edges
 def euclidean(a, b):
 	return math.sqrt(pow(a[1] - b[1], 2) + pow(a[0] - b[0], 2))
+	
 
-# create the cities' coordinates array
-	# "P01" https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
+def get_nodes() -> list:
+	''' 
+	Construct node positional arrays, where each item is an xy coordinate 
+	in a 2d euclidean space.
 
-def get_cities() -> list:
-	# 9125 "cities" in Argentina, FAILS b/c only one cluster produced
-	# Therefore, need to reconsider clustering algorithm
-	# filename = "data_sets/ar9125_nodes.txt"  
+	'''
 
-	filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
+	# LARGE
+	# http://www.math.uwaterloo.ca/tsp/world/countries.html
+	# filename = "data_sets/ar9125_nodes.txt"  # Argentina: 9125_nodes.txt
+	# filename = "data_sets/lu980_output.txt"  # Luxemburg: 980 "citites"
+	# filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
+
+	# CUSTOM - randomized cities built ontop of "P01" template
 	# filename = "gen_cities.txt"  # 116 cities
-	# filename = "city_xy_2"  # 48 cities
-	# filename = "city_xy"  # 15 cities
+
+	# SMALL
+	# https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
+	# filename = "city_xy_2"  # "ATT48" American US state capitals
+	filename = "city_xy"  # # "P01": 15 cities
 	nodes = []
 
 	with open(filename, 'r') as f:
@@ -65,6 +80,9 @@ def draw_solution(path:list) -> None:
 
 
 def tour_distance(path:list) -> int:
+	'''
+	Total distance of solution
+	'''
 	total_distance = 0
 	for i, n in enumerate(path):
 		if i == len(path) - 1:
@@ -75,6 +93,10 @@ def tour_distance(path:list) -> int:
 
 
 def two_opt_swap(cluster_path:list, start:int, stop:int) -> list:
+	'''
+	Function to swap nodes during the 2-opt process
+	2-opt implementation based of https://en.wikipedia.org/wiki/2-opt pseudocode 
+	'''
 	new_route = []
 	for i in range(0, start):
 		new_route.append(cluster_path[i])
@@ -85,7 +107,18 @@ def two_opt_swap(cluster_path:list, start:int, stop:int) -> list:
 	return new_route
 
 
-def two_opt(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
+def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
+	'''
+	Iterates through cluster nodes. Obtains the location of core nodes within the 
+	inter-cluster path (where inter_cluster_path holds one core node for each cluster).
+	Obtains inter-cluster nodes adjacent to core node (not nodes within the core node's
+	cluster!). Calculates the midpoints between core node and both adajcent node. 
+	The start and end node for the H.path within the cluster is based of nodes that 
+	are closest to these midpoints within the cluster. 2-opt is then used on the cluster.
+	The start and end nodes are not included in the 2-opt search, I.e., they remain at 
+	the start and end of the list representing the H.path of the cluster.
+	'''
+
 	# get cluster with core node
 	for c_core in cluster_cores:
 		cluster_label = c_core[1]
@@ -119,10 +152,7 @@ def two_opt(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
 		cluster_path = list()
 		for c in clusters:
 			# find cluster
-			# print(f" OLD cluster_path: {c[1]}\n")
 			if c[0][0] == cluster_label:
-				# print("YES")
-				
 				start_node = sorted(c[1], key=lambda x:euclidean(x,m_prev))[0]
 				end_node = sorted([n for n in c[1] if n != start_node], key=lambda x:euclidean(x,m_next))[0]
 				cluster_path.append(start_node)
@@ -130,9 +160,10 @@ def two_opt(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
 					if n != start_node and n != end_node:
 						cluster_path.append(n)
 				cluster_path.append(end_node)
-				# print(f" NEW cluster_path: {cluster_path}\n")
 				break
 
+		# perform 2-opt
+		# clear caveats due to local optima, however cluster sizes should be relatively small
 		improved = True
 		while improved is True:
 			improved = False
@@ -146,9 +177,8 @@ def two_opt(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
 						best_distance = new_distance
 						improved = True
 
-		# print(f"NEW CLUSTER PATH 2 OPT: {cluster_path}\n")
 
-
+		# Link the cluster's path with the inter cluster path
 		l = inter_cluster_path[0:c_node_loc]
 		mid = cluster_path
 		r = inter_cluster_path[c_node_loc + 1: len(inter_cluster_path)]
@@ -158,25 +188,29 @@ def two_opt(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
 
 
 def main():
-	nodes = get_cities()
 
-	# apply clustering algorithm
+	nodes = get_nodes()
+
+	
 	cities_np = np.array(nodes)
-	clusterer = hdbscan.HDBSCAN()
-	clusterer.fit(cities_np)
+	clusterer = hdbscan.HDBSCAN()  # improved DBSCAN
+	clusterer.fit(cities_np)  # apply clustering algorithm
+	
+	# configure colors to represent nodes belonging to clusters on scatter graph
 	color_palette = sns.color_palette('deep', 1000)
 	cluster_colors = [color_palette[x] if x >= 0 else (0.5, 0.5, 0.5) for x in clusterer.labels_]
 	cluster_member_colors = [sns.desaturate(x, p) for x, p in zip(cluster_colors, clusterer.probabilities_)]
-	# plot as scatter graph
+	
+	# plot scatter graph
 	plt.scatter(*cities_np.T, s=50, linewidth=0, c=cluster_member_colors, alpha=0.75)
 	plt.savefig("graph_hdbscan.png")
 	
-	# initialise cluster's list. Holds paths and meta data. I.e. link nodes 
-	clusters = list()
-	cluster_cores = list()  # pseudo-centroids and the cluster they belong to
+	# initialise cluster's list. 
+	clusters = list()  # cluster items will contain members and meta-info
+	cluster_cores = list()  # treat as "pseudo-centroids" similar to previous meanshift prototype
 
 	for k in np.unique(clusterer.labels_):
-		meta_info = [k]  # contains: label, 1 core node (pseudo-centroid), link nodes (later)
+		meta_info = [k]  # contains: label, 1 core node ("pseudo-centroid"), link nodes (later)
 		cluster_nodes = []
 		for i, node in enumerate(cities_np.tolist()):
 			if clusterer.labels_[i] == k:
@@ -197,16 +231,16 @@ def main():
 			inter_cluster_nodes.append(c[0][1])  # add core node
 
 	# Determine inter-cluster path via ACO
+	# print(inter_cluster_nodes)
 	world = pants.World(inter_cluster_nodes, euclidean)
-	solver = pants.Solver(limit=3000)  # limit = 100
+	solver = pants.Solver(limit=1500)  # def limit = 100 ?
 	solution = solver.solve(world)
 
 	# re-order clusters array according to inter_cluster_solution
 	inter_cluster_path = [n for n in solution.tour]
 	
-	path = two_opt(inter_cluster_path, cluster_cores, clusters)
-
-	# print(path)
+	# build the final solution
+	path = build_path(inter_cluster_path, cluster_cores, clusters)
 
 	# auxiliary functions
 	draw_solution(path)  # create a graph for solution

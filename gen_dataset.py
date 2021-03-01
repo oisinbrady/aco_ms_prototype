@@ -13,7 +13,7 @@ with open(filename, 'r') as f:
 	f.close()
 
 
-f = open("gen_cities.txt","w+")
+f = open("data_sets/gen_cities.tsp","w+")
 for n in nodes:
 	f.write(f"{n[0]}, {n[1]}\n")
 
