@@ -40,7 +40,7 @@ def get_nodes() -> list:
 	# http://www.math.uwaterloo.ca/tsp/world/countries.html
 	# filename = "data_sets/ar9125_nodes.txt"  # Argentina: 9125_nodes.txt
 	# filename = "data_sets/lu980_output.txt"  # Luxemburg: 980 "citites"
-	# filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
+	filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
 
 	# CUSTOM - randomized cities built ontop of "P01" template
 	# filename = "data_sets/gen_cities.txt"  # 116 cities
@@ -48,7 +48,7 @@ def get_nodes() -> list:
 	# SMALL
 	# https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html
 	# filename = "data_sets/city_xy_2"  # "ATT48" American US state capitals
-	filename = "data_sets/city_xy"  # # "P01": 15 cities
+	# filename = "data_sets/city_xy"  # # "P01": 15 cities
 	nodes = []
 
 	with open(filename, 'r') as f:
@@ -76,7 +76,7 @@ def draw_solution(path:list) -> None:
 
 	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
 
-	plt.savefig("solution.png")
+	plt.savefig("output/solution.png")
 
 
 def tour_distance(path:list) -> int:
@@ -153,17 +153,12 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 		for c in clusters:
 			# find cluster
 			if c[0][0] == cluster_label:
-				start_node = sorted(c[1], key=lambda x:euclidean(x,m_prev))[0]
-				end_node = sorted([n for n in c[1] if n != start_node], key=lambda x:euclidean(x,m_next))[0]
-				cluster_path.append(start_node)
-				for n in c[1]:
-					if n != start_node and n != end_node:
-						cluster_path.append(n)
-				cluster_path.append(end_node)
+				cluster_path = sorted(c[1], key=lambda x:euclidean(x,m_prev))
 				break
 
 		# perform 2-opt
 		# clear caveats due to local optima, however cluster sizes should be relatively small
+
 		improved = True
 		while improved is True:
 			improved = False
@@ -177,7 +172,6 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 						best_distance = new_distance
 						improved = True
 
-
 		# Link the cluster's path with the inter cluster path
 		l = inter_cluster_path[0:c_node_loc]
 		mid = cluster_path
@@ -188,12 +182,10 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 
 
 def main():
-
 	nodes = get_nodes()
-
 	
 	cities_np = np.array(nodes)
-	clusterer = hdbscan.HDBSCAN()  # improved DBSCAN
+	clusterer = hdbscan.HDBSCAN(min_cluster_size=25)  # improved DBSCAN
 	clusterer.fit(cities_np)  # apply clustering algorithm
 	
 	# configure colors to represent nodes belonging to clusters on scatter graph
@@ -203,7 +195,7 @@ def main():
 	
 	# plot scatter graph
 	plt.scatter(*cities_np.T, s=50, linewidth=0, c=cluster_member_colors, alpha=0.75)
-	plt.savefig("graph_hdbscan.png")
+	plt.savefig("output/graph_hdbscan.png")
 	
 	# initialise cluster's list. 
 	clusters = list()  # cluster items will contain members and meta-info
