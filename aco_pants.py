@@ -1,10 +1,13 @@
-import pants
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 import hdbscan  #  https://hdbscan.readthedocs.io/en/latest/comparing_clustering_algorithms.html#hdbscan
 import seaborn as sns
+
+from sko.ACA import ACA_TSP  # https://github.com/guofei9987/scikit-opt
+import pandas as pd
+from scipy import spatial
 
 
 # TODO seperate progam to solve via standalone ACO strategy
@@ -77,6 +80,7 @@ def draw_solution(path:list) -> None:
 	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
 
 	plt.savefig("output/solution.png")
+	plt.close()
 
 
 def tour_distance(path:list) -> int:
@@ -119,6 +123,7 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 	the start and end of the list representing the H.path of the cluster.
 	'''
 
+	inter_cluster_path = inter_cluster_path.tolist()
 	# get cluster with core node
 	for c_core in cluster_cores:
 		cluster_label = c_core[1]
@@ -181,11 +186,16 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 	return inter_cluster_path
 
 
+def cal_total_distance(routine):
+    num_points, = routine.shape
+    return sum([distance_matrix[routine[i % num_points], routine[(i + 1) % num_points]] for i in range(num_points)])
+
+
 def main():
 	nodes = get_nodes()
 	
 	cities_np = np.array(nodes)
-	clusterer = hdbscan.HDBSCAN(min_cluster_size=25)  # improved DBSCAN
+	clusterer = hdbscan.HDBSCAN()  # improved DBSCAN
 	clusterer.fit(cities_np)  # apply clustering algorithm
 	
 	# configure colors to represent nodes belonging to clusters on scatter graph
@@ -222,21 +232,37 @@ def main():
 		else:
 			inter_cluster_nodes.append(c[0][1])  # add core node
 
-	# Determine inter-cluster path via ACO
-	# print(inter_cluster_nodes)
-	world = pants.World(inter_cluster_nodes, euclidean)
-	solver = pants.Solver(limit=1500)  # def limit = 100 ?
-	solution = solver.solve(world)
+	
+	np_icn = np.array(inter_cluster_nodes)
+	distance_matrix = spatial.distance.cdist(np_icn, np_icn, metric='euclidean')
+	num_points = len(np_icn)
 
-	# re-order clusters array according to inter_cluster_solution
-	inter_cluster_path = [n for n in solution.tour]
+	def cal_total_distance(routine):
+		num_points, = routine.shape
+		return sum([distance_matrix[routine[i % num_points], routine[(i + 1) % num_points]] for i in range(num_points)])
+
+	# Determine inter-cluster path via ACO
+	aca = ACA_TSP(func=cal_total_distance, n_dim=len(np_icn),
+	              size_pop=150, max_iter=125,
+	              distance_matrix=distance_matrix)
+
+	# running aco is clearly the bottleneck
+	best_x, best_y = aca.run()
+
+	best_points_ = np.concatenate([best_x, [best_x[0]]])
+
+	inter_cluster_path = np_icn[best_points_, :]
 	
 	# build the final solution
 	path = build_path(inter_cluster_path, cluster_cores, clusters)
 
+	# TODO 2-opt for path improvement
+
 	# auxiliary functions
 	draw_solution(path)  # create a graph for solution
-	print(f"{tour_distance(path)}")  # calculate total distance
+	print(f"Total distance: {tour_distance(path)} (abr. units)")  # calculate total distance
+	print("Graph solution written to: output/solution.png")
+	print("Clustering solution written to: output/graph_hdbscan.png")
 
 if __name__ == '__main__':
 	main()
