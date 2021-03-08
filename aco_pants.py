@@ -71,13 +71,15 @@ def draw_solution(path:list) -> None:
 		if i == len(path) - 1:
 			v = 0
 			G.add_node(0, pos=path[0])
+			# from last to first node
 		else:
 			v = i + 1
 			G.add_node(i+1, pos=path[i+1])
+			# from current node to next node in path
 
 		G.add_edge(i,v)
 
-	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=1)
+	nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=False, node_size=1)
 
 	plt.savefig("output/solution.png")
 	plt.close()
@@ -104,11 +106,26 @@ def two_opt_swap(cluster_path:list, start:int, stop:int) -> list:
 	new_route = []
 	for i in range(0, start):
 		new_route.append(cluster_path[i])
-	for i in range(stop, start, -1):
+	for i in range(stop, start - 1, -1):
 		new_route.append(cluster_path[i])
-	for i in range(stop, len(cluster_path)):
+	for i in range(stop + 1, len(cluster_path)):
 		new_route.append(cluster_path[i])
 	return new_route
+
+def two_opt(cluster_path:list) -> list:
+	improved = True
+	while improved is True:
+		improved = False
+		best_distance = tour_distance(cluster_path)
+		for i in range(1, len(cluster_path) - 1):
+			for j in range(i+1, len(cluster_path) - 1):
+				new_route = two_opt_swap(cluster_path, i, j)
+				new_distance = tour_distance(new_route)
+				if new_distance < best_distance:
+					cluster_path = new_route
+					best_distance = new_distance
+					improved = True
+	return cluster_path
 
 
 def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> list:
@@ -163,25 +180,18 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 
 		# perform 2-opt
 		# clear caveats due to local optima, however cluster sizes should be relatively small
+		#	therefore, potential risk to solution optimality is lower
 
-		improved = True
-		while improved is True:
-			improved = False
-			best_distance = tour_distance(cluster_path)
-			for i in range(1, len(cluster_path) - 1):
-				for j in range(i+1, len(cluster_path) - 1):
-					new_route = two_opt_swap(cluster_path, i, j)
-					new_distance = tour_distance(new_route)
-					if new_distance < best_distance:
-						cluster_path = new_route
-						best_distance = new_distance
-						improved = True
+		cluster_path = two_opt(cluster_path)
 
 		# Link the cluster's path with the inter cluster path
-		l = inter_cluster_path[0:c_node_loc]
-		mid = cluster_path
-		r = inter_cluster_path[c_node_loc + 1: len(inter_cluster_path)]
-		inter_cluster_path = l + mid + r
+
+		del inter_cluster_path[c_node_loc]  # remove the core already existing in cluster_path
+		insertion_point = c_node_loc
+		# add the cluster's path to the relevant location
+		for i in range(len(cluster_path)):
+			inter_cluster_path.insert(insertion_point, cluster_path[i]) # insert the cluster path 
+			insertion_point = insertion_point + 1
 	
 	return inter_cluster_path
 
@@ -217,6 +227,7 @@ def main():
 		for i, node in enumerate(cities_np.tolist()):
 			if clusterer.labels_[i] == k:
 				cluster_nodes.append(node)
+				# TODO maybe find centroids instead - mean xy coordinates
 				if len(meta_info) == 1 and meta_info[0] != -1:
 					if clusterer.probabilities_[i] == 1.0:
 						# add a core node 
@@ -242,21 +253,24 @@ def main():
 		return sum([distance_matrix[routine[i % num_points], routine[(i + 1) % num_points]] for i in range(num_points)])
 
 	# Determine inter-cluster path via ACO
+	# https://scikit-opt.github.io/scikit-opt/#/en/README?id=_5-aca-ant-colony-algorithm-for-tsp
+
 	aca = ACA_TSP(func=cal_total_distance, n_dim=len(np_icn),
 	              size_pop=150, max_iter=125,
 	              distance_matrix=distance_matrix)
 
-	# running aco is clearly the bottleneck
+	# bottleneck No.1
+	print("running ACO on inter-cluster path...")
 	best_x, best_y = aca.run()
-
 	best_points_ = np.concatenate([best_x, [best_x[0]]])
-
 	inter_cluster_path = np_icn[best_points_, :]
 	
-	# build the final solution
+	print("building final path...")
 	path = build_path(inter_cluster_path, cluster_cores, clusters)
 
-	# TODO 2-opt for path improvement
+	# bottleneck No.2
+	print("optimising with 2-opt")
+	path = two_opt(path)
 
 	# auxiliary functions
 	draw_solution(path)  # create a graph for solution
