@@ -1,31 +1,22 @@
-import math
-import numpy as np
-import matplotlib.pyplot as plt
-import networkx as nx
+import math  # for distance measurements
+import numpy as np  # for networkx, matplotlib, and ACO alg.
+import matplotlib.pyplot as plt  # graph plotting
+import networkx as nx  # solution graph
 import hdbscan  #  https://hdbscan.readthedocs.io/en/latest/comparing_clustering_algorithms.html#hdbscan
-import seaborn as sns
+import seaborn as sns  # for scatter graph cluster colors
 
+# ACO
 from sko.ACA import ACA_TSP  # https://github.com/guofei9987/scikit-opt
-import pandas as pd
 from scipy import spatial
 
 
 # TODO seperate progam to solve via standalone ACO strategy
 # Use cProfiler to compare runtime performance
 
-# TODO find alternative clustering algorithms
-
 # TODO, current bottle neck within ACO of inter_cluster_nodes. 
-	# I.e., Non-cluster nodes and 1 core node of each cluster.
-	# "LARGE" instances incur significat wait times
-	# Consider:
-	# 	Iteration limit param: "limit=x"
-	#	ACO library is rather old, is the implementation efficient?
-	#	Reversing method of solving inter/intra-cluster paths
-		# (ACO for clusters and 2-opt/3-opt(? - slower) for everything else)
-	# Heuristic for pre-determining size of cluster
+	# Heuristic for pre-determining HDBSCAN params
 		# See HDBSCAN for parameter configuration
-			# IDEA: grid cell mean density pre-computation to determine param(s)
+		# IDEA: grid cell mean density pre-computation to determine param(s)
 
 # length function for weight value of edges
 def euclidean(a, b):
@@ -112,6 +103,7 @@ def two_opt_swap(cluster_path:list, start:int, stop:int) -> list:
 		new_route.append(cluster_path[i])
 	return new_route
 
+
 def two_opt(cluster_path:list) -> list:
 	improved = True
 	while improved is True:
@@ -159,15 +151,10 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 					p_node = inter_cluster_path[len(inter_cluster_path) - 1]
 				else:
 					p_node = inter_cluster_path[i - 1]
-				if i == len(inter_cluster_path) - 1:
-					n_node = inter_cluster_path[0]
-				else:
-					n_node = inter_cluster_path[i + 1]
 				break
 
-		# calculate m_prev, m_next: midpoints between adjacent nodes and core node
+		# calculate m_prev: midpoint between adjacent nodes and core node
 		m_prev = [(p_node[0] + core_node[0])/2, (p_node[1] + core_node[1])/2]
-		m_next = [(n_node[0] + core_node[0])/2, (n_node[1] + core_node[1])/2]
 
 		start_node = None
 		end_node = None
@@ -175,6 +162,12 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 		for c in clusters:
 			# find cluster
 			if c[0][0] == cluster_label:
+				'''
+				Sort path according to distance from mid-point between previous, 
+				non-clustered node, and core node of cluster. This results in a list 
+				where the start and end (link) nodes of the H.path within the cluster 
+				are at either end.
+				'''
 				cluster_path = sorted(c[1], key=lambda x:euclidean(x,m_prev))
 				break
 
@@ -187,18 +180,12 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 		# Link the cluster's path with the inter cluster path
 
 		del inter_cluster_path[c_node_loc]  # remove the core already existing in cluster_path
-		insertion_point = c_node_loc
-		# add the cluster's path to the relevant location
+		insertion_point = c_node_loc  # add cluster's path to the relevant location
 		for i in range(len(cluster_path)):
 			inter_cluster_path.insert(insertion_point, cluster_path[i]) # insert the cluster path 
 			insertion_point = insertion_point + 1
 	
 	return inter_cluster_path
-
-
-def cal_total_distance(routine):
-    num_points, = routine.shape
-    return sum([distance_matrix[routine[i % num_points], routine[(i + 1) % num_points]] for i in range(num_points)])
 
 
 def main():
@@ -209,7 +196,7 @@ def main():
 	clusterer.fit(cities_np)  # apply clustering algorithm
 	
 	# configure colors to represent nodes belonging to clusters on scatter graph
-	color_palette = sns.color_palette('deep', 1000)
+	color_palette = sns.color_palette('deep', len(np.unique(clusterer.labels_)))
 	cluster_colors = [color_palette[x] if x >= 0 else (0.5, 0.5, 0.5) for x in clusterer.labels_]
 	cluster_member_colors = [sns.desaturate(x, p) for x, p in zip(cluster_colors, clusterer.probabilities_)]
 	
@@ -255,6 +242,7 @@ def main():
 	# Determine inter-cluster path via ACO
 	# https://scikit-opt.github.io/scikit-opt/#/en/README?id=_5-aca-ant-colony-algorithm-for-tsp
 
+	# doc (link above) includes graph plot for relative improvement (distance) per iteration
 	aca = ACA_TSP(func=cal_total_distance, n_dim=len(np_icn),
 	              size_pop=150, max_iter=125,
 	              distance_matrix=distance_matrix)
