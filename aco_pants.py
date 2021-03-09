@@ -13,7 +13,8 @@ from scipy import spatial
 # TODO seperate progam to solve via standalone ACO strategy
 # Use cProfiler to compare runtime performance
 
-# TODO, current bottle neck within ACO of inter_cluster_nodes. 
+# TODO, work on minimizing current bottle neck within ACO of inter_cluster_nodes.
+        # what effect does average cluster size have on run-time?
 	# Heuristic for pre-determining HDBSCAN params
 		# See HDBSCAN for parameter configuration
 		# IDEA: grid cell mean density pre-computation to determine param(s)
