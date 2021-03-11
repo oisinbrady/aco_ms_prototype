@@ -4,7 +4,7 @@ import random
 filename = "city_xy"
 nodes = []
 
-with open(filename, 'r') as f:
+with open(f"../data_sets/{filename}", 'r') as f:
 	for city in f:
 		city = city.strip()
 		xy = city.split(',')
@@ -13,7 +13,7 @@ with open(filename, 'r') as f:
 	f.close()
 
 
-f = open("data_sets/gen_cities.tsp","w+")
+f = open("../data_sets/gen_cities.tsp","w+")
 for n in nodes:
 	f.write(f"{n[0]}, {n[1]}\n")
 

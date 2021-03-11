@@ -1,6 +1,6 @@
 filename = "lu980.tsp"
 nodes = []
-with open(filename, "r") as f:
+with open(f"../data_sets/{filename}", "r") as f:
     nodes = f.readlines()[7:]
    
 seen_nodes = []
@@ -14,7 +14,7 @@ for node in nodes:
 				seen_nodes.append(node)
 			break;
 
-f = open(f"{filename[:len(filename) - 4]}_output.txt","w+")
+f = open(f"../output/{filename[:len(filename) - 4]}_output.txt","w+")
 for n in filtered_nodes:
 	n = n.strip()
 	xy = n.split(' ')

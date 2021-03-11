@@ -258,7 +258,7 @@ def main():
 	path = build_path(inter_cluster_path, cluster_cores, clusters)
 
 	# bottleneck No.2
-	print("optimising with 2-opt")
+	print("optimising with 2-opt...")
 	path = two_opt(path)
 
 	# auxiliary functions
