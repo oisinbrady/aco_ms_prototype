@@ -35,7 +35,8 @@ def get_nodes() -> list:
 	# http://www.math.uwaterloo.ca/tsp/world/countries.html
 	# filename = "data_sets/ar9125_nodes.txt"  # Argentina: 9125_nodes.txt
 	# filename = "data_sets/lu980_output.txt"  # Luxemburg: 980 "citites"
-	filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
+	# filename = "data_sets/qa194_output.txt" # Qatar: 119 "cities"
+	filename = "data_sets/qa194_short_output.txt" # For demo
 
 	# CUSTOM - randomized cities built ontop of "P01" template
 	# filename = "data_sets/gen_cities.txt"  # 116 cities
@@ -93,7 +94,7 @@ def tour_distance(path:list) -> int:
 def two_opt_swap(cluster_path:list, start:int, stop:int) -> list:
 	'''
 	Function to swap nodes during the 2-opt process
-	2-opt implementation based of https://en.wikipedia.org/wiki/2-opt pseudocode 
+	2-opt implementation based of pseudocode from https://en.wikipedia.org/wiki/2-opt pseudocode 
 	'''
 	new_route = []
 	for i in range(0, start):
@@ -193,7 +194,7 @@ def main():
 	nodes = get_nodes()
 	
 	cities_np = np.array(nodes)
-	clusterer = hdbscan.HDBSCAN()  # improved DBSCAN
+	clusterer = hdbscan.HDBSCAN(min_cluster_size=7, min_samples=1)  # improved DBSCAN
 	clusterer.fit(cities_np)  # apply clustering algorithm
 	
 	# configure colors to represent nodes belonging to clusters on scatter graph
@@ -215,7 +216,7 @@ def main():
 		for i, node in enumerate(cities_np.tolist()):
 			if clusterer.labels_[i] == k:
 				cluster_nodes.append(node)
-				# TODO maybe find centroids instead - mean xy coordinates
+		
 				if len(meta_info) == 1 and meta_info[0] != -1:
 					if clusterer.probabilities_[i] == 1.0:
 						# add a core node 

@@ -1,0 +1,118 @@
+DEMO MONDAY 15th 
+
+BACKGROUND
+
+- what is aco?
+	- initially proposed in 1992
+	- A heuristic relying on the behaviour of ants. Used in path finding. Key concepts: pheromone, weight function (euclidean distance), iterations
+	- Python scikit-opt library, it is well documented and has example usage 
+	- https://github.com/guofei9987/scikit-opt
+
+	- shows usage example:
+		- https://medium.com/@sakamoto2000.kim/ant-colony-optimization-aco-in-the-travel-salesman-problem-tsp-54f83ccd9eff
+
+	- this library implement the max-min ant function
+		- traditional Ant systems are more prone to stagnation as a consequence of the greedy selection that takes place in prioritising certain paths based on pheromone/distance
+		- mmas limits the pheromone secreted at the end of an iteration to only one ant agent
+			- this is usually the ant that has the best path in the iteration
+			- could also be the best ant in all the global solutions so far
+			- this avoids running into local optima more often
+		- mmas also limits the number of total pheromone trails (possible paths) within a range
+			- avoids stagnation 
+		- initial number of pheromones for first iteration is always at the maximum of the range mentioned
+			- this means that more paths are explored before specialising into certain search spaces
+		LINK: https://www.sciencedirect.com/science/article/pii/S0167739X00000431#SEC16
+
+
+- what is clustering?
+	- mapping certain data-points to a label based of characteristics/relationships between itself and other data-points
+	- for example, nodes in a graph that are very closely packed together may belong to a single cluster
+	- Many different approaches, applicable/best instances, caveats, etc. 
+
+	- Common types of clustering algorithms:
+		- Centroid based clustering
+			- K-means
+			- Meanshift
+				- Keeping prototype 1 simple
+					- Non-parametric
+					- Easy to work with
+		- Density based clustering
+			- DBSCAN
+				- good for datasets of high density
+				- produced clusters that have arbitrary shape
+				- allows for outlier data-points, not members of any cluster
+				- non-parametric, doesn't NEED initial parameters unlike K-means
+		- distribution based clustering
+			- Gaussian distribution
+			- more circular clusters
+			- not so applicable if I don't know the distribution of the data-set 
+		- hierachical clustering
+			- forms a tree of clusters
+				- parent and child clusters 
+				- the idea of prunning/merging clusters based of heirarchical level is interesting and might be applicable to tsp datasets.
+					- I.e. only limiting the number and size of clusters for efficiency sake
+					- H(ierarchical)-DBSCAN is made by one of the original authors of DBSCAN and combines density based clustering methods from DBSCAN as well as heirarchical methods which is why I used it in prototype 2
+				) https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html#
+				1) Transform the space according to the density/sparsity.
+			    2) Build the minimum spanning tree of the distance weighted graph.
+			    3) Construct a cluster hierarchy of connected components.
+			    4) Condense the cluster hierarchy based on minimum cluster size.
+			    5) Extract the stable clusters from the condensed tree.
+
+- what is tsp?
+	- Given a non-directed, weighted graph, what is the most optimal route possible that visits each and every node exactly once before returning to the starting node in the path. Essentially, finding the most optimal Hamiltonian cycle in a graph. Optimallity depends on minimisation of the total weighted value of the chosen path. In this instance, it refers to reducing the total distance of each edge between a node. 
+
+- combining these:
+	- clustering is used as a "preprocessing" step in the prototypes. It determines groups of nodes that can be independently solved as hamiltonian cycles. Later, the path between each cluster group will be solved to form the entire Hamiltonian cycle. An important step involves determining what nodes from a cluster are used to link to outside nodes when forming the entire solution path. This decision process of finding link nodes varies according the two prototypes I currently have. In principle the concept of a "core" or "centroid" of a cluster remains the same.
+
+	- The general reason behind generating clusters in the first place is to improve the scalability of ACO. By divide and conquer, larger instances will hopefully be solved faster and will be "good-enough" in terms of optimality.
+
+
+	Steps in prototype 2:
+
+	- HDBSCAN, an improved version of DBSCAN is used to form density based clusters
+	- Nodes are subsequently divided into clusters, or are not a member of any cluster - so called inter-cluster nodes.
+	- From each cluster, one node is selected to mark the "core" of a cluster. (core is determined by the HDBSCAN algorithm)
+	- All inter-cluster nodes along with the core nodes mentioned are added to a list and a Hamiltonian Cycle is solved via ACO. 
+
+	- Now we have a general aproximate solution exlcuding most of the nodes from each cluster
+	- We now have to solve each cluster and determine what nodes in the cluster to link to the inter-cluster path previously sovled. 
+	- This is done by calculating the midpoint between the node in the solved inter-cluster path and the core of the cluster
+	- Then we find the closest node in the cluster to the mid-point and mark it as the start node, the furthest one will be assumed to be the end node
+	- Each cluster is then solved via 2-opt
+		- The array of nodes in each cluster is modified to have the start and end nodes reperesented at either end of the array
+		- The 2-opt algorithm is applied to this cluster array, EXCLUDING the start and end node
+		- 2-opt will iterate through each pair permuation of nodes in a list, and determine the total length of the path. A shorter distance path will be re-used in this processes until the algorithm no longer finds a better path. NOTE, this could very well be local optima. However, the total size of the cluster is not so large as to minimise the other-all effect of this potential worst-case.
+	- then the core coordinate of the cluster in the inter-cluster path is replaced by the 2-opt solved path.
+
+	- finally, another round of 2-opt is applied to the whole solution to polish inefficiencies in the ACO solution.
+
+
+	- SHOW INPUT/OUTPUT SCREENSHOTS
+	
+	Prototype 1:
+
+	- used a similar idea with core nodes, in this case it is reffered to as a centroid node as is an artificial point in the euclidean space. I.e., the centroid coordinate does not belong to a node but is the mean coordinate of all nodes in a cluster. This centroid coordinate is determined by the Mean shift algorithm. 
+
+	- The major flaw with Mean shift is that is does not allow for outlier nodes - nodes that are not part of a cluster. This means that erroneous data points can cause issues in the solution path. 
+
+	- Instead of 2-opt, ACO was used to solve each cluster individually. 
+
+
+RESEARCH
+
+
+
+Time-frame:
+Background: 3/4 minutes
+Technical (screen-share code + input and output graphs): 6/7 minutes
+
+JUSTIFICATIONS
+
+- Why Python?
+- why mean shift?
+- why hdbscan?
+	- why hdbscan instead of dbscan?
+- why change ACO library?
+- why use datasets from TSPLIB95?
+- why 2-opt?
