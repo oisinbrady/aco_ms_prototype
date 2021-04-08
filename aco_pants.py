@@ -9,6 +9,9 @@ import seaborn as sns  # for scatter graph cluster colors
 from sko.ACA import ACA_TSP  # https://github.com/guofei9987/scikit-opt
 from scipy import spatial
 
+# SA
+from randomized_tsp.tsp import tsp
+
 
 # TODO seperate progam to solve via standalone ACO strategy
 # Use cProfiler to compare runtime performance
@@ -177,14 +180,40 @@ def build_path(inter_cluster_path:list, cluster_cores:list, clusters:list) -> li
 		# clear caveats due to local optima, however cluster sizes should be relatively small
 		#	therefore, potential risk to solution optimality is lower
 
-		cluster_path = two_opt(cluster_path)
+		# cluster_path = two_opt(cluster_path)
+		cluster_path_np = np.array(cluster_path)
+		distance_matrix = spatial.distance.cdist(cluster_path_np, cluster_path_np, metric='euclidean')
+		
+		# print("BEFORE")
+		tsp_obj = tsp(distance_matrix)
+
+		# TODO only apply to non-link nodes
+		# feasible?
+
+		cluster_path_indicies, cost = tsp_obj.simulated_annealing()
+
+		print(len(cluster_path))
+		print(len(cluster_path_indicies))
+		print(cluster_path_indicies)
+
+		# re-order list according to SA solution node order
+		print("BEFORE")
+		print(cluster_path)
+
+		new_path = list()
+		for i in cluster_path_indicies:
+			new_path.append(cluster_path[i])
+
+		print("AFTER")
+		print(new_path)
+
 
 		# Link the cluster's path with the inter cluster path
 
-		del inter_cluster_path[c_node_loc]  # remove the core already existing in cluster_path
+		del inter_cluster_path[c_node_loc]  # remove the core already existing in new_path
 		insertion_point = c_node_loc  # add cluster's path to the relevant location
-		for i in range(len(cluster_path)):
-			inter_cluster_path.insert(insertion_point, cluster_path[i]) # insert the cluster path 
+		for i in range(len(new_path)):
+			inter_cluster_path.insert(insertion_point, new_path[i]) # insert the new_path 
 			insertion_point = insertion_point + 1
 	
 	return inter_cluster_path
@@ -256,14 +285,15 @@ def main():
 	inter_cluster_path = np_icn[best_points_, :]
 	
 	print("building final path...")
+
+	# TODO replace path building within clusters with simulated annealling
+	# https://pypi.org/project/satsp/
+	# TODO general cleanup/refactor
 	path = build_path(inter_cluster_path, cluster_cores, clusters)
 
 	# bottleneck No.2
-	# TODO replace with simulated annealling
-	# https://pypi.org/project/satsp/
-
-	print("optimising with 2-opt...")
-	path = two_opt(path)
+	# print("optimising with 2-opt...")
+	# path = two_opt(path)
 
 	# auxiliary functions
 	draw_solution(path)  # create a graph for solution
